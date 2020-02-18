@@ -99,12 +99,15 @@ class Depand:
         comps2.append(comp)
         return comps2
     def _eles(self,data):
-        try:
-            for d in data:
-                for e in self._eles(d):
-                    yield e
-        except:
+        if isinstance(data,str):
             yield data
+        else:
+            try:
+                for d in data:
+                    for e in self._eles(d):
+                        yield e
+            except:
+                yield data
 
 class _Key:
     def __init__(self,key):
