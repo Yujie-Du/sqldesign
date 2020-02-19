@@ -34,20 +34,55 @@ class Depand:
             result+=temp
         return self._tokey(result)
     def decomp(self):
+        return self.decompBC()
+    def decompBC(self):
         comps=[[self._tokey(self.relys.keys()),[]]]
-        while(1):
-            comps2=self._decomp(comps)
-            if comps2==comps:
-                return comps
-            comps=comps2
-        return comps
-    def _decomp(self,comps):
-        comps=list(comps)
         funcs=[self._key2key,
              self._key2other,
              self._other2key,
              self._other2other,
              ]
+        while(1):
+            comps2=self._decomp(comps,funcs)
+            if comps2==comps:
+                return comps
+            comps=comps2
+        return comps
+    def decomp1(self):
+        comps=[[self._tokey(self.relys.keys()),[]]]
+        funcs=[self._key2key,
+             ]
+        while(1):
+            comps2=self._decomp(comps,funcs)
+            if comps2==comps:
+                return comps
+            comps=comps2
+        return comps
+    def decomp2(self):
+        comps=[[self._tokey(self.relys.keys()),[]]]
+        funcs=[self._key2key,
+             self._other2key,
+             ]
+        while(1):
+            comps2=self._decomp(comps,funcs)
+            if comps2==comps:
+                return comps
+            comps=comps2
+        return comps
+    def decomp3(self):
+        comps=[[self._tokey(self.relys.keys()),[]]]
+        funcs=[self._key2key,
+             self._other2key,
+             self._other2other,
+             ]
+        while(1):
+            comps2=self._decomp(comps,funcs)
+            if comps2==comps:
+                return comps
+            comps=comps2
+        return comps
+    def _decomp(self,comps,funcs):
+        comps=list(comps)
         idx=0
         while(idx<len(comps)):
             for func in funcs:
