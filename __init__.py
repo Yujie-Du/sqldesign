@@ -1,169 +1,155 @@
 # -*- coding: utf-8 -*-
-
-
 class Depand:
-    def __init__(self):
-        self.data={}
-    #添加字段依赖关系
-    def addrelys(self,keys,relys=[]):
-        changed=0
-        keys=list(self._eles(keys))
-        relys=list(self._eles(relys))
+    def __init__(self,relydict={}):
+        self.relys={}
+        for k,v in relydict.items():
+            self.addrelys(k,v)
+    def addrelys(self,keys,relys):
+        keys,relys=self._tokey(keys),self._tokey(relys)
+        for k in keys+relys:
+            if k not in self.relys:
+                self.relys[k]=[]
         for key in keys:
-            if key not in self.data:
-                self.data[key]=_Key(key)
-            for rely in relys:
-                if rely not in self.data:
-                    self.data[rely]=_Key(rely)
-                if self.data[key].addrely(self.data[rely]):
-                    changed+=1
-        return changed
-    def delrelys(self,keys,relys=[]):
-        changed=0
-        keys=list(self._eles(keys))
-        relys=list(self._eles(relys))
-        relys=[r for r in relys if r in self.data]
-        for key in keys:
-            if key not in self.data:
-                continue
-            for rely in relys:
-                if self.data[key].delrely(self.data[rely]):
-                    changed+=1
-        return changed
-    def ifrely(self,key,relys):
-        key=self.data[key]
-        relys=list(self._eles(relys))
-        relys=[self.data[r] for r in relys]
-        result=key.ifrely(relys)
-        if result is None:
-            return None
-        return [r.key for r in result]
-    def getorigins(self):
-        relys={}
-        for k in self.data.values():
-            relys[k.key]=[r.key for r in k.getorigins()]
-        return relys
-    def getrelys(self):
-        relys={}
-        for k in self.data.values():
-            relys[k.key]=[r.key for r in k.getrelys()]
-        return relys
-    def decomp(self):
-        return self.decomp3()
-    def decomp1(self):
-        relys=self.getorigins()
-        result={}
-        for k,v in relys.items():
-            if len(v)==0:
-                continue
-            v=tuple(v)
-            if v in result:
-                result[v].append(k)
-            else:
-                result[v]=[k]
-        return [[tuple(k),tuple(v)] for k,v in result.items()]
-    def decomp2(self):
-        relys=self.getrelys()
-        result={}
-        for k,v in relys.items():
-            if len(v)==0:
-                continue
-            v=tuple(v)
-            if v in result:
-                result[v].append(k)
-            else:
-                result[v]=[k]
-        return [[tuple(k),tuple(v)] for k,v in result.items()]
-    def decomp3(self):
-        comps=[]
-        for comp in self.decomp2():
-            comps+=self._decomp3unit(comp)
-        return comps
-    def _decomp3unit(self,comp):
-        keys=list(comp[1])
-        depand=Depand()
-        for idx in range(len(keys)):
-            key=keys[idx]
-            temp=[t for t in keys if t!=key]
-            temp=self.ifrely(key,temp)
-            if len(temp)>0:
-                depand.addrelys(key,temp)
-        if len(depand.data)==0:
-            return [comp]
-        comps2=depand.decomp3()
-        for c in comps2:
-            for k in c[1]:
-                if k in keys:
-                    keys.remove(k)
-        comp=[comp[0],tuple(keys)]
-        comps2.append(comp)
-        return comps2
-    def _eles(self,data):
-        if isinstance(data,str):
-            yield data
-        else:
+            self.relys[key]=self._tokey(self.relys[key]+relys)
             try:
-                for d in data:
-                    for e in self._eles(d):
-                        yield e
+                self.relys[key].remove(key)
             except:
-                yield data
-
-class _Key:
-    def __init__(self,key):
-        self.key=key
-        self.origins=[]
-        self.relys=[]
-        self.dectrely=[]
-        self.changed=0
-    def ifrely(self,relys,last=[]):
-        if self in relys:
-            return [self]
-        if self in last:
-            return []
-        last.append(self)
+                pass
+    def delrelys(self,keys,relys):
+        keys=list(self._eles(keys))
+        relys=list(self._eles(relys))
+        for key in keys:
+            for rely in relys:
+                try:
+                    self.relys[key].remove(rely)
+                except:
+                    pass
+    def ifrely(self,keys,relys):
+        keys,relys=self._tokey(keys),self._tokey(relys)
         result=[]
-        for ori in self.origins:
-            r=ori.ifrely(relys,last)
+        for k in keys:
+            temp=self._ifrely(k,relys,[])
+            if temp is None:
+                return None
+            result+=temp
+        return self._tokey(result)
+    def decomp(self):
+        comps=[[self._tokey(self.relys.keys()),[]]]
+        while(1):
+            comps2=self._decomp(comps)
+            if comps2==comps:
+                return comps
+            comps=comps2
+        return comps
+    def _decomp(self,comps):
+        comps=list(comps)
+        funcs=[self._key2key,
+             self._key2other,
+             self._other2key,
+             self._other2other,
+             ]
+        idx=0
+        while(idx<len(comps)):
+            for func in funcs:
+                temps=func(comps[idx])
+                comps[idx:idx+1]=temps
+            idx+=1
+        comps=self._compComps(comps)
+        return comps
+    def _other2key(self,comp):
+        keys,others=list(comp[0]),list(comp[1])
+        comps=[]
+        for ot in list(others):
+            temp=self.ifrely(ot,keys)
+            if temp is None or len(temp)==0:
+                comps.append([[ot],[]])
+                others.remove(ot)
+            elif len(temp)<len(keys):
+                comps.append([temp,[ot]])
+                others.remove(ot)
+        comps.append([keys,others])
+        comps=self._compComps(comps)
+        return comps
+    def _key2key(self,comp):
+        keys,others=list(comp[0]),list(comp[1])
+        comps=[]
+        for key in list(keys):
+            temp=[k for k in keys if k!=key]
+            temp=self.ifrely(key,temp)
+            if temp is not None and len(temp)>0:
+                comps.append([temp,[key]])
+                keys.remove(key)
+        comps.append([keys,others])
+        comps=self._compComps(comps)
+        return comps
+    def _key2other(self,comp):
+        keys,others=list(comp[0]),list(comp[1])
+        comps=[]
+        for key in list(keys):
+            temp=self.ifrely(key,others)
+            if temp is not None and len(temp)>0:
+                if self.ifrely(temp,key) is None:
+                    comps.append([temp,[key]])
+                    keys.remove(key)
+                    keys+=temp
+                    for t in temp:
+                        others.remove(temp)
+        comps.append([keys,others])
+        comps=self._compComps(comps)
+        return comps
+    def _other2other(self,comp):
+        keys,others=list(comp[0]),list(comp[1])
+        if len(others)<=1:
+            return [comp]
+        comps=[]
+        for ot in list(others):
+            temp=[o for o in others if o!=ot]
+            temp=self.ifrely(ot,temp)
+            if temp is not None and len(temp)>0:
+                comps.append([temp,[ot]])
+                others.remove(ot)
+        comps.append([keys,others])
+        comps=self._compComps(comps)
+        return comps
+    def _tokey(self,key):
+        return list(sorted(set(self._eles(key))))
+    def _compComps(self,comps):
+        comps2={}
+        for ks,os in comps:
+            ks,os=tuple(self._tokey(ks)),self._tokey(os)
+            try:
+                comps2[ks]+=os
+            except:
+                comps2[ks]=os
+        try:
+            del comps2[tuple([])]
+        except:
+            pass
+        return [[list(k),self._tokey(v)] for k,v in comps2.items()]
+    def _ifrely(self,key,relys,last):
+        if key in relys:
+            return [key]
+        if key in last:
+            return []
+        last.append(key)
+        result=[]
+        origins=self.relys[key]
+        if len(origins)==0:
+            return None
+        result=[]
+        for ori in origins:
+            r=self._ifrely(ori,relys,last)
             if r is None:
                 return None
             result+=r
-        return result
-    def addrely(self,rely):
-        if (rely is not self) and (rely not in self.origins):
-            self.origins.append(rely)
-            self.changed+=1
-            return True
-        return False
-    def delrely(self,rely):
-        if rely in self.origins:
-            self.origins.remove(rely)
-            self.changed+=1
-            return True
-        return False
-    def _addrelys(self,rs):
-        tip=False
-        for r in rs:
-            if self._addrely(r):
-                tip=True
-        return tip
-    def _addrely(self,r):
-        if r is self:
-            return False
-        if r in self.relys:
-            return False
-        rs=r.getrelys()
-        if len(rs)==0:
-            self.relys.append(r)
-            return True
-        return self._addrelys(rs)
-    def cleanrelys(self):
-        if self.changed>0:
-            self.changed=0
-            self.relys=[]
-            self._addrelys(self.origins)
-    def getrelys(self):
-        self.cleanrelys()
-        return self.relys
-    def getorigins(self):
-        return self.origins
+        return self._tokey(result)
+    def _eles(self,data):
+        if isinstance(data,str):
+            yield data
+            return
+        try:
+            for d in data:
+                for e in self._eles(d):
+                    yield e
+        except:
+            yield str(data)
